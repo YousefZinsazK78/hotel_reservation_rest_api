@@ -17,6 +17,25 @@ func NewUserHandler(userStore db.UserStore) *UserHandler {
 	}
 }
 
+func (h *UserHandler) HandlePostUser(ctx *fiber.Ctx) error {
+	var params types.CreateUserParams
+	if err := ctx.BodyParser(&params); err != nil {
+		return err
+	}
+	if errors := params.Validate(); len(errors) > 0 {
+		return ctx.JSON(errors)
+	}
+	user, err := types.NewUserFromParams(params)
+	if err != nil {
+		return err
+	}
+	insertedUser, err := h.userStore.InsertUser(ctx.Context(), user)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(insertedUser)
+}
+
 func (h *UserHandler) HandleGetUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 	ctx := context.Background()
@@ -27,11 +46,10 @@ func (h *UserHandler) HandleGetUser(c *fiber.Ctx) error {
 	return c.JSON(user)
 }
 
-func (h *UserHandler) HandleListUser(ctx *fiber.Ctx) error {
-	u := types.User{
-		ID:        "0",
-		FirstName: "yousef",
-		LastName:  "zinsaz",
+func (h *UserHandler) HandleGetUsers(ctx *fiber.Ctx) error {
+	users, err := h.userStore.GetUsers(ctx.Context())
+	if err != nil {
+		return err
 	}
-	return ctx.JSON(u)
+	return ctx.JSON(users)
 }
