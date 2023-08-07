@@ -1,4 +1,13 @@
 package db
 
-const dbname = "hotel_reservation"
-const userColl = "users"
+const (
+	DBname   = "hotel_reservation"
+	DBuri    = "mongodb://localhost:27017"
+	UserColl = "users"
+)
+
+type Store struct {
+	User  UserStore
+	Hotel HotelStore
+	Room  RoomStore
+}
