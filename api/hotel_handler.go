@@ -3,7 +3,6 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/yousefzinsazk78/hotel_reservation/db"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -19,11 +18,7 @@ func NewHotelHandler(store *db.Store) *HotelHandler {
 
 func (h *HotelHandler) HandleGetHotel(c *fiber.Ctx) error {
 	id := c.Params("id")
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return ErrInvalidID()
-	}
-	hotel, err := h.store.Hotel.GetHotelByID(c.Context(), oid)
+	hotel, err := h.store.Hotel.GetHotelByID(c.Context(), id)
 	if err != nil {
 		return ErrResourceNotFound("hotel")
 	}
@@ -37,7 +32,7 @@ func (h *HotelHandler) HandleGetRooms(c *fiber.Ctx) error {
 		return ErrInvalidID()
 	}
 
-	filter := bson.M{"hotelID": oid}
+	filter := db.Map{"hotelID": oid}
 	rooms, err := h.store.Room.GetRooms(c.Context(), filter)
 	if err != nil {
 		return ErrResourceNotFound("hotel")
@@ -45,10 +40,35 @@ func (h *HotelHandler) HandleGetRooms(c *fiber.Ctx) error {
 	return c.JSON(rooms)
 }
 
+type ResourceResp struct {
+	Results int `json:"results"`
+	Data    any `json:"data"`
+	Page    int `json:"page"`
+	Limit   int `json:"limit"`
+}
+
+type HotelQueryParams struct {
+	db.Pagination
+	Rating int
+}
+
 func (h *HotelHandler) HandleGetHotels(c *fiber.Ctx) error {
-	hotels, err := h.store.Hotel.GetHotels(c.Context(), nil)
+	var params HotelQueryParams
+	if err := c.QueryParser(&params); err != nil {
+		return ErrBadRequest()
+	}
+	filter := db.Map{
+		"rating": params.Rating,
+	}
+	hotels, err := h.store.Hotel.GetHotels(c.Context(), filter, &params.Pagination)
 	if err != nil {
 		return err
 	}
-	return c.JSON(hotels)
+	respp := ResourceResp{
+		Results: len(hotels),
+		Data:    hotels,
+		Page:    int(params.Page),
+		Limit:   int(params.Limit),
+	}
+	return c.JSON(respp)
 }

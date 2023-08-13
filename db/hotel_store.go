@@ -6,13 +6,15 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"os"
 )
 
 type HotelStore interface {
 	InsertHotel(context.Context, *types.Hotel) (*types.Hotel, error)
-	Update(context.Context, bson.M, bson.M) error
-	GetHotels(context.Context, bson.M) ([]*types.Hotel, error)
-	GetHotelByID(context.Context, primitive.ObjectID) (*types.Hotel, error)
+	Update(context.Context, Map, Map) error
+	GetHotels(context.Context, Map, *Pagination) ([]*types.Hotel, error)
+	GetHotelByID(context.Context, string) (*types.Hotel, error)
 }
 
 type MongoHotelStore struct {
@@ -21,13 +23,14 @@ type MongoHotelStore struct {
 }
 
 func NewMongoHotelStore(client *mongo.Client) *MongoHotelStore {
+	dbname := os.Getenv(MongoDbNameEnvName)
 	return &MongoHotelStore{
 		client: client,
-		coll:   client.Database(DBname).Collection("hotels"),
+		coll:   client.Database(dbname).Collection("hotels"),
 	}
 }
 
-func (s *MongoHotelStore) GetHotelByID(ctx context.Context, id primitive.ObjectID) (*types.Hotel, error) {
+func (s *MongoHotelStore) GetHotelByID(ctx context.Context, id string) (*types.Hotel, error) {
 	var hotel types.Hotel
 	if err := s.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&hotel); err != nil {
 		return nil, err
@@ -35,8 +38,11 @@ func (s *MongoHotelStore) GetHotelByID(ctx context.Context, id primitive.ObjectI
 	return &hotel, nil
 }
 
-func (s *MongoHotelStore) GetHotels(ctx context.Context, filter bson.M) ([]*types.Hotel, error) {
-	resp, err := s.coll.Find(ctx, filter)
+func (s *MongoHotelStore) GetHotels(ctx context.Context, filter Map, pagination *Pagination) ([]*types.Hotel, error) {
+	opts := options.FindOptions{}
+	opts.SetSkip((pagination.Page - 1) * pagination.Limit)
+	opts.SetLimit(pagination.Limit)
+	resp, err := s.coll.Find(ctx, filter, &opts)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +53,7 @@ func (s *MongoHotelStore) GetHotels(ctx context.Context, filter bson.M) ([]*type
 	return hotels, nil
 }
 
-func (s *MongoHotelStore) Update(ctx context.Context, filter bson.M, update bson.M) error {
+func (s *MongoHotelStore) Update(ctx context.Context, filter Map, update Map) error {
 	_, err := s.coll.UpdateOne(ctx, filter, update)
 	return err
 }
