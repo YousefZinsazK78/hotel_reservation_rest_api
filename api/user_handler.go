@@ -24,7 +24,7 @@ func NewUserHandler(userStore db.UserStore) *UserHandler {
 func (h *UserHandler) HandlePostUser(ctx *fiber.Ctx) error {
 	var params types.CreateUserParams
 	if err := ctx.BodyParser(&params); err != nil {
-		return err
+		return ErrBadRequest()
 	}
 	if errors := params.Validate(); len(errors) > 0 {
 		return ctx.JSON(errors)
@@ -42,16 +42,15 @@ func (h *UserHandler) HandlePostUser(ctx *fiber.Ctx) error {
 
 func (h *UserHandler) HandlePutUser(ctx *fiber.Ctx) error {
 	var (
-		//values bson.M
 		params types.UpdateUserParams
 		userID = ctx.Params("id")
 	)
-	if err := ctx.BodyParser(&params); err != nil {
-		return err
-	}
 	oid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return err
+		return ErrInvalidID()
+	}
+	if err := ctx.BodyParser(&params); err != nil {
+		return ErrBadRequest()
 	}
 	filter := bson.M{"_id": oid}
 	if err := h.userStore.UpdateUser(ctx.Context(), filter, params); err != nil {
@@ -73,7 +72,7 @@ func (h *UserHandler) HandleGetUser(c *fiber.Ctx) error {
 	ctx := context.Background()
 	user, err := h.userStore.GetUserByID(ctx, id)
 	if err != nil {
-		return err
+		return ErrResourceNotFound("user")
 	}
 	return c.JSON(user)
 }
@@ -84,7 +83,7 @@ func (h *UserHandler) HandleGetUsers(ctx *fiber.Ctx) error {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return ctx.JSON(map[string]string{"msg": "not found"})
 		}
-		return err
+		return ErrResourceNotFound("user")
 	}
 	return ctx.JSON(users)
 }

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"github.com/gofiber/fiber/v2"
 	"github.com/yousefzinsazk78/hotel_reservation/api"
-	"github.com/yousefzinsazk78/hotel_reservation/api/middleware"
 	"github.com/yousefzinsazk78/hotel_reservation/db"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -13,9 +12,7 @@ import (
 )
 
 var config = fiber.Config{
-	ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-		return ctx.JSON(map[string]string{"error": err.Error()})
-	},
+	ErrorHandler: api.ErrorHandler,
 }
 
 func main() {
@@ -46,7 +43,8 @@ func main() {
 		bookingHandler = api.NewBookingHandler(store)
 		app            = fiber.New(config)
 		auth           = app.Group("/api")
-		apiv1          = app.Group("/api/v1", middleware.JWTAuthentication(userStore))
+		apiv1          = app.Group("/api/v1", api.JWTAuthentication(userStore))
+		admin          = apiv1.Group("/admin", api.AdminAuth)
 	)
 
 	//auth
@@ -68,10 +66,12 @@ func main() {
 	apiv1.Get("/rooms", roomHandler.HandleGetRooms)
 	apiv1.Post("/room/:id/book", roomHandler.HandleBookRoom)
 
-	//TODO : cancle a booking
-
 	//bookings handler
-	apiv1.Get("/booking", bookingHandler.HandleGetBookings)
 	apiv1.Get("/booking/:id", bookingHandler.HandleGetBooking)
+	apiv1.Get("/booking/:id/cancel", bookingHandler.HandleCancelBookings)
+
+	//admin handler
+	admin.Get("/booking", bookingHandler.HandleGetBookings)
+
 	log.Fatal(app.Listen(*listenAddr))
 }

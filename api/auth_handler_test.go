@@ -2,43 +2,25 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"github.com/yousefzinsazk78/hotel_reservation/db"
-	"github.com/yousefzinsazk78/hotel_reservation/types"
+	"github.com/yousefzinsazk78/hotel_reservation/db/fixtures"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 )
 
-func insertTestUser(t *testing.T, userStore db.UserStore) *types.User {
-	user, err := types.NewUserFromParams(types.CreateUserParams{
-		FirstName: "yousef",
-		LastName:  "zinsaz",
-		Email:     "yousef@yousef.com",
-		Password:  "supersecurepassword123",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = userStore.InsertUser(context.TODO(), user)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return user
-}
-
 func TestAuthenticateWithWrongPassword(t *testing.T) {
 	tdb := setup(t)
-	tdb.teardown(t)
+	defer tdb.teardown(t)
 
 	//insertUser := insertTestUser(t, tdb.UserStore)
+	fixtures.AddUser(tdb.Store, "yousef", "yousef", false)
 
 	app := fiber.New()
-	authHandler := NewAuthHandler(tdb.UserStore)
+	authHandler := NewAuthHandler(tdb.User)
 	app.Post("/", authHandler.HandleAuthenticate)
 
 	params := AuthParams{
@@ -69,17 +51,17 @@ func TestAuthenticateWithWrongPassword(t *testing.T) {
 
 func TestAuthenticate(t *testing.T) {
 	tdb := setup(t)
-	tdb.teardown(t)
-
-	insertUser := insertTestUser(t, tdb.UserStore)
+	defer tdb.teardown(t)
+	//insertUser := insertTestUser(t, tdb.User)
+	insertedUser := fixtures.AddUser(tdb.Store, "yousef", "yousef", false)
 
 	app := fiber.New()
-	authHandler := NewAuthHandler(tdb.UserStore)
+	authHandler := NewAuthHandler(tdb.User)
 	app.Post("/", authHandler.HandleAuthenticate)
 
 	params := AuthParams{
 		Email:    "yousef@yousef.com",
-		Password: "supersecurepassword123",
+		Password: "yousef_yousef",
 	}
 	b, _ := json.Marshal(params)
 	req := httptest.NewRequest("POST", "/", bytes.NewReader(b))
@@ -102,9 +84,9 @@ func TestAuthenticate(t *testing.T) {
 	}
 
 	//set the encrypted password to an empty string, because we dont return that in any response....
-	insertUser.EncryptedPassword = ""
-	if !reflect.DeepEqual(insertUser, authResp.User) {
-		fmt.Println(insertUser)
+	insertedUser.EncryptedPassword = ""
+	if !reflect.DeepEqual(insertedUser, authResp.User) {
+		fmt.Println(insertedUser)
 		fmt.Println(authResp.User)
 		t.Fatalf("expected the user to be the inserted user.")
 	}
